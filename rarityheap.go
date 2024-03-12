@@ -6,7 +6,7 @@ import (
 
 type RarityHeap []*RarityScorecard
 
-func (h RarityHeap) Len() int           { 
+func (h RarityHeap) Len() int { 
 	return len(h) 
 }
 

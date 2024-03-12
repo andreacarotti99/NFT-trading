@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"os"
 	"sync"
-	"runtime"
-	"time"
+	//"runtime"
+	//"time"
 	"container/heap"
 )
 
@@ -19,6 +19,8 @@ const COLLECTION = "azuki"
 const COLOR_GREEN = "\033[32m"
 const COLOR_RED = "\033[31m"
 const COLOR_RESET = "\033[0m"
+
+const maxRoutines = 500
 
 var logger *log.Logger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
 
@@ -80,7 +82,7 @@ func getTokens(col Collection) []*Token {
 // ----
 
 func main() {
-	runtime.GOMAXPROCS(2)
+	
 	azuki := Collection{
 		count: 10000,
 		url:   "azuki1",
@@ -88,7 +90,6 @@ func main() {
 
 	tokens := getTokensAndMetadataConcurrently(azuki)
 
-	
 	rarityHeap := NewRarityHeap()
 
 	for _, token := range tokens {
@@ -103,7 +104,6 @@ func main() {
 		}
 	}
 
-
 	//printTokenTraitsAndRarity(tokens)
 	//printMaps()
 	fmt.Println("Top 5 Rarest Tokens:")
@@ -111,7 +111,6 @@ func main() {
 		fmt.Printf("Token ID: %d, Rarity: %f\n", scorecard.id, scorecard.rarity)
 	}
 
-	
 }
 
 
@@ -129,8 +128,6 @@ func printTokenTraitsAndRarity(tokens []*Token) {
 }
 
 
-
-
 // updateTraitCounts updates the global trait count maps in a thread-safe manner
 func updateTraitCounts(token *Token) {
     mutex.Lock()
@@ -143,7 +140,6 @@ func updateTraitCounts(token *Token) {
         }
     }
 }
-
 
 // fetchAndUpdateToken combines token fetching and updating counts
 func fetchAndUpdateToken(id int, colUrl string) *Token {
@@ -158,17 +154,20 @@ func fetchAndUpdateToken(id int, colUrl string) *Token {
 func getTokensAndMetadataConcurrently(col Collection) []*Token {
     tokens := make([]*Token, col.count)
     var wg sync.WaitGroup
-    tokenChan := make(chan *Token, col.count) // Channel to collect tokens
+    tokenChan := make(chan *Token, col.count) 
+
+	semaphore := make(chan struct{}, maxRoutines)
+
 
 	//change to col.count instead of 1000
     for i := 1; i <= col.count; i++ {
-		if (i % 1000 == 0){
-			time.Sleep(1000 * time.Millisecond)
-		}
+		
 
         wg.Add(1)
+		semaphore <- struct{}{} // Acquire semaphore (blocking if full)
         go func(id int) {
             defer wg.Done()
+			defer func() { <-semaphore }() // Release semaphore
             
 			logger.Println(string(COLOR_GREEN), fmt.Sprintf("Getting token %d", id), string(COLOR_RESET))
             token := fetchAndUpdateToken(id, col.url)
