@@ -21,6 +21,7 @@ const COLOR_RED = "\033[31m"
 const COLOR_RESET = "\033[0m"
 
 const maxRoutines = 500
+const topK = 5
 
 var logger *log.Logger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
 
@@ -95,7 +96,7 @@ func main() {
 	for _, token := range tokens {
 		if token != nil {
 			rarityScore := computeRarity(token)
-			if rarityHeap.Len() < 5 {
+			if rarityHeap.Len() < topK {
 				heap.Push(rarityHeap, &RarityScorecard{rarity: rarityScore, id: token.id})
 			} else if rarityScore > (*rarityHeap)[0].rarity {
 				heap.Pop(rarityHeap)
@@ -106,7 +107,7 @@ func main() {
 
 	//printTokenTraitsAndRarity(tokens)
 	//printMaps()
-	fmt.Println("Top 5 Rarest Tokens:")
+	fmt.Printf("Top %d Rarest Tokens:\n", topK)
 	for _, scorecard := range *rarityHeap {
 		fmt.Printf("Token ID: %d, Rarity: %f\n", scorecard.id, scorecard.rarity)
 	}
@@ -155,14 +156,10 @@ func getTokensAndMetadataConcurrently(col Collection) []*Token {
     tokens := make([]*Token, col.count)
     var wg sync.WaitGroup
     tokenChan := make(chan *Token, col.count) 
-
 	semaphore := make(chan struct{}, maxRoutines)
-
 
 	//change to col.count instead of 1000
     for i := 1; i <= col.count; i++ {
-		
-
         wg.Add(1)
 		semaphore <- struct{}{} // Acquire semaphore (blocking if full)
         go func(id int) {
