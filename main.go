@@ -20,7 +20,7 @@ const COLOR_GREEN = "\033[32m"
 const COLOR_RED = "\033[31m"
 const COLOR_RESET = "\033[0m"
 
-const maxRoutines = 500
+const maxRoutines = 2000
 const topK = 5
 
 var logger *log.Logger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
