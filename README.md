@@ -31,8 +31,8 @@ This tool calculates and ranks the rarity of NFTs within a specific collection. 
 
 #### Run the program
 Arguments:
-- topK: number of rarest token you want to display
-- routines: maximum number of concurrent go routines used (suggested value [500-900])
+- topK: number of rarest token you want to display (default 5)
+- routines: maximum number of concurrent go routines used (suggested value [500-900]) (default 500)
 - useWorkerPool: boolean to use the implementation with worker pool (true) or semaphores (default false)
 
 Example:
