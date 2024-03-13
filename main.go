@@ -107,9 +107,10 @@ func main() {
 		}
 	}
 
+	// function to pop tokens from the heap ordered by rarity
 	DisplayOrderedTopKTokens(rarityHeap)
 
-	// Calculate the total duration
+	// Calculate the total execution time
 	endTime := time.Now()
 	fmt.Printf("Total execution time: %v\n", endTime.Sub(startTime))
 }

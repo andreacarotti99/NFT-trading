@@ -28,6 +28,13 @@ This tool calculates and ranks the rarity of NFTs within a specific collection. 
   - Maintains a dynamic collection of the top 5 rarest tokens based on computed rarity scores. After fetching all the data, when we iterate over the tokens and compute the rarity we push the rarest element in the heap. The top K elements are printed out by popping from the heap the elements
 
 ## Run the program
+
+#### Run the program
+Arguments:
+- topK: number of rarest token you want to display
+- routines: maximum number of concurrent go routines used (suggested value [500-900])
+- useWorkerPool: boolean to use the implementation with worker pool (true) or semaphores (default false)
+
 Example:
 ```
 go run . -topK=5 -routines=900 -useWorkerPool=true
