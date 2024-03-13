@@ -25,7 +25,7 @@ This tool calculates and ranks the rarity of NFTs within a specific collection. 
 - **Network**:
   - Custom settings for timeouts, maximum idle connections, and idle connection timeout
 - **Heap for Top Rarest Tokens**:
-  - Maintains a dynamic collection of the top 5 rarest tokens based on computed rarity scores. After fetching all the data, when we iterate over the tokens and compute the rarity we push the rarest element in the heap. The top K elements are printed out unordered
+  - Maintains a dynamic collection of the top 5 rarest tokens based on computed rarity scores. After fetching all the data, when we iterate over the tokens and compute the rarity we push the rarest element in the heap. The top K elements are printed out by popping from the heap the elements
 
 ## Run the program
 Example:
