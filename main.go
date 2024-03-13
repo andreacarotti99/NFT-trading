@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 	"container/heap"
+	"flag"
 )
 
 
@@ -19,8 +20,11 @@ const COLOR_GREEN = "\033[32m"
 const COLOR_RED = "\033[31m"
 const COLOR_RESET = "\033[0m"
 
-const maxRoutines = 500
-const topK = 5
+var (
+	maxRoutines = flag.Int("routines", 500, "the maximum number of concurrent goroutines") // Value suggested less than 2800
+	topK = flag.Int("topK", 5, "the number of top rarest tokens to display")
+	useWorkerPool = flag.Bool("useWorkerPool", false, "use worker pool pattern instead of semaphore for concurrency")
+)
 
 var logger *log.Logger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
 
@@ -112,6 +116,7 @@ func getTokens(col Collection) []*Token {
 
 
 func main() {
+	flag.Parse()
 
 	// Record the start time of the program execution for measurements
 	startTime := time.Now()
@@ -122,13 +127,17 @@ func main() {
 		url:   "azuki1",
 	}
 
-	// Fetch tokens and their metadata for the 'azuki' collection. The function
-	// 'getTokensAndMetadataWithSemaphore' utilizes a semaphore to limit concurrent
-	// HTTP requests, thereby avoiding rate limits or server overload.
-	tokens := getTokensAndMetadataWithSemaphore(azuki)
+	var tokens []*Token
 
-	// 'GetTokensAndMetadataWithWorkerPool' uses a worker pool pattern to manage concurrency. This is defined in 'workers.go'
-	// tokens := GetTokensAndMetadataWithWorkerPool(azuki) //implementation in workers.go
+	// Fetch tokens and their metadata for the 'azuki' collection. The function
+	if *useWorkerPool {
+		// 'GetTokensAndMetadataWithWorkerPool' uses a worker pool pattern to manage concurrency. This is defined in 'workers.go'
+		tokens = GetTokensAndMetadataWithWorkerPool(azuki, *maxRoutines) //implementation in workers.go
+	} else {
+		// 'getTokensAndMetadataWithSemaphore' utilizes a semaphore to limit concurrent
+		// HTTP requests, avoiding rate limits or server overload.
+		tokens = getTokensAndMetadataWithSemaphore(azuki)
+	}	
 
 	// Initialize a priority queue (heap) to store tokens by their rarity scores.
 	rarityHeap := NewRarityHeap() 
@@ -143,7 +152,7 @@ func main() {
 
 			// If the heap does not contain the top K elements yet, add the current token's rarity score.
 			// Otherwise, compare the current token's rarity score with the minimum in the heap and replace it if the current token is rarer.
-			if rarityHeap.Len() < topK {
+			if rarityHeap.Len() < *topK {
 				heap.Push(rarityHeap, &RarityScorecard{rarity: rarityScore, id: token.id})
 			} else if rarityScore > (*rarityHeap)[0].rarity {
 				heap.Pop(rarityHeap) // Remove the least rare token
@@ -153,7 +162,7 @@ func main() {
 	}
 
 	// Display the top K rarest tokens by iterating through the rarity heap. The list is not displayed ordered
-	fmt.Printf("Top %d Rarest Tokens:\n", topK)
+	fmt.Printf("Top %d Rarest Tokens:\n", *topK)
 	for _, scorecard := range *rarityHeap {
 		fmt.Printf("Token ID: %d, Rarity: %f\n", scorecard.id, scorecard.rarity)
 	}
@@ -179,23 +188,39 @@ func printTokenTraitsAndRarity(tokens []*Token) {
 }
 
 
-// updateTraitCounts updates the global trait count maps in a thread-safe manner
+// updateTraitCounts safely updates global maps (traitValueCount and traitCategoryValueCount)
+// that track the count of each unique trait value and the count of unique values per trait category
+// for a given token. This function is designed to be called concurrently in a multithreaded environment.
 func updateTraitCounts(token *Token) {
+	// Lock the mutex to ensure exclusive access to the global maps. This prevents concurrent access from multiple goroutines.
     mutex.Lock()
-    defer mutex.Unlock()
+
+	// Schedule the mutex to be unlocked once the function execution is complete
+    defer mutex.Unlock() 
+
+	// Iterate through each attribute (trait and its value) in the token
     for trait, value := range token.attrs {
+		
+		// Construct a unique key for the trait value by combining the trait name and value.
         traitValueKey := fmt.Sprintf("%s: %s", trait, value)
+
+		// Increment the count for this specific trait value in the traitValueCount map.
+        // This tracks how many times each specific trait value appears across all tokens.
         traitValueCount[traitValueKey]++
+
+		// This tracks how many different values each trait has across all tokens.
         if traitValueCount[traitValueKey] == 1 {
             traitCategoryValueCount[trait]++
         }
     }
 }
 
-// fetchAndUpdateToken combines token fetching and updating counts
+// fetchAndUpdateToken retrieves a token by its ID and collection URL, updates global counts for its traits, and returns the token
 func fetchAndUpdateToken(id int, colUrl string) *Token {
+	// Retrieve the token from the specified collection URL and ID.
     token := getToken(id, colUrl)
     if token != nil {
+		// If the token exists, update the global trait counts based on this token's traits
         updateTraitCounts(token)
     }
     return token
@@ -206,31 +231,44 @@ func fetchAndUpdateToken(id int, colUrl string) *Token {
 // using a semaphore to limit the number of concurrent fetch operations.
 func getTokensAndMetadataWithSemaphore(col Collection) []*Token {
 
-	// Initialize a slice to hold pointers to the Token structs, one for each token in the collection.
+	// Initialize a slice to hold pointers to the Token structs, one for each token in the collection
     tokens := make([]*Token, col.count)
 
-	// Use a WaitGroup to wait for all goroutines launched here to finish.
+	// Use a WaitGroup to wait for all goroutines launched to finish
     var wg sync.WaitGroup
-    tokenChan := make(chan *Token, col.count) 
-	semaphore := make(chan struct{}, maxRoutines)
 
-	//change to col.count instead of 1000
+	// Create a channel to communicate tokens back from goroutines
+    // Buffered with col.count to potentially hold all tokens and avoid blocking on send
+    tokenChan := make(chan *Token, col.count) 
+
+	// Create a semaphore with a capacity of maxRoutines to limit the number of concurrent goroutines
+	semaphore := make(chan struct{}, *maxRoutines)
+
+	// Loop over each token ID in the collection
     for i := 1; i <= col.count; i++ {
         wg.Add(1)
 		semaphore <- struct{}{} // Acquire semaphore (blocking if full)
+
         go func(id int) {
-            defer wg.Done()
-			defer func() { <-semaphore }() // Release semaphore
+            defer wg.Done() // Signal goroutine's completion upon return
+			defer func() { <-semaphore }() // Release semaphore after the goroutine finishes
 			//logger.Println(string(COLOR_GREEN), fmt.Sprintf("Getting token %d", id), string(COLOR_RESET))
-            token := fetchAndUpdateToken(id, col.url)
+            
+			// Fetch the token's metadata and update the global maps holding the frequency of the attrs.
+			token := fetchAndUpdateToken(id, col.url)
+
+			// Send the token through the channel to be collected outside the goroutine.
             tokenChan <- token
         }(i)
     }
 
+	// Launch a goroutine to close the tokenChan once all fetch goroutines have completed.
     go func() {
         wg.Wait()
-        close(tokenChan)
+        close(tokenChan) // Close the channel
     }()
+
+	// Collect tokens from the channel as they arrive and store them in the tokens slice.
     index := 0
     for token := range tokenChan {
         tokens[index] = token
@@ -259,6 +297,7 @@ func computeRarity(token *Token) float64 {
     return rarity
 }
 
+// debug function
 func printMaps() {
     // Print traitValueCount map
     fmt.Println("Trait-Value Counts:")

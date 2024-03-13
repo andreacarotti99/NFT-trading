@@ -10,7 +10,7 @@ func worker(worker_id int, jobs <-chan int, results chan<- *Token, colUrl string
     }
 }
 
-func GetTokensAndMetadataWithWorkerPool(col Collection) []*Token {
+func GetTokensAndMetadataWithWorkerPool(col Collection, maxRoutines int) []*Token {
     // Prepare channels for jobs and results
     jobs := make(chan int, col.count)
     results := make(chan *Token, col.count)
