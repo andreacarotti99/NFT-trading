@@ -5,7 +5,7 @@ package main
 func worker(worker_id int, jobs <-chan int, results chan<- *Token, colUrl string) {
     for tokenId := range jobs {
 		//logger.Println(string(COLOR_GREEN), fmt.Sprintf("Getting token %d", j), string(COLOR_RESET))
-        token := fetchAndUpdateToken(tokenId, colUrl)
+        token := FetchAndUpdateToken(tokenId, colUrl)
         results <- token
     }
 }

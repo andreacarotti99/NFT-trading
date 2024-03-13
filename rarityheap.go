@@ -35,3 +35,5 @@ func NewRarityHeap() *RarityHeap {
 	heap.Init(&rh)
 	return &rh
 }
+
+
