@@ -32,3 +32,4 @@ Example:
 ```
 go run . -topK=5 -routines=900 -useWorkerPool=true
 ```
+The suggested routines were tested with up to 2500 routines, more than that caused network errors.  
