@@ -21,7 +21,7 @@ const COLOR_RED = "\033[31m"
 const COLOR_RESET = "\033[0m"
 
 var (
-	maxRoutines = flag.Int("routines", 500, "the maximum number of concurrent goroutines") // Value suggested less than 2800
+	maxRoutines = flag.Int("routines", 500, "the maximum number of concurrent goroutines") // Value suggested less than 2500
 	topK = flag.Int("topK", 5, "the number of top rarest tokens to display")
 	useWorkerPool = flag.Bool("useWorkerPool", false, "use worker pool pattern instead of semaphore for concurrency")
 )
@@ -54,7 +54,7 @@ type Collection struct {
 // Define a custom HTTP client with specific configurations
 var customClient = &http.Client{
 	// Set a timeout for the HTTP client. Determines how long the client should wait
-    Timeout: time.Second * 10, 
+    Timeout: time.Second * 20, 
     Transport: &http.Transport{
 		// Keeping idle connections allows for faster subsequent requests to the same host
         // by reusing the existing connection rather than establishing a new one
@@ -82,7 +82,7 @@ func getToken(tid int, colUrl string) *Token {
         return &Token{}
     }
 	
-	// Ensures the response body is closed after the function returns to avoid resource leaks.
+	// Ensures the response body is closed after the function returns.
     defer res.Body.Close()
 
 	// Reads the entire response body.
@@ -161,16 +161,11 @@ func main() {
 		}
 	}
 
-	// Display the top K rarest tokens by iterating through the rarity heap. The list is not displayed ordered
-	fmt.Printf("Top %d Rarest Tokens:\n", *topK)
-	for _, scorecard := range *rarityHeap {
-		fmt.Printf("Token ID: %d, Rarity: %f\n", scorecard.id, scorecard.rarity)
-	}
+	displayOrderedTopKTokens(rarityHeap)
 
 	// Calculate the total duration
 	endTime := time.Now()
 	fmt.Printf("Total execution time: %v\n", endTime.Sub(startTime))
-
 }
 
 
@@ -295,6 +290,20 @@ func computeRarity(token *Token) float64 {
         rarity += 1 / (float64(countWithTraitValue) * float64(numValuesInCategory))
     }
     return rarity
+}
+
+
+
+func displayOrderedTopKTokens(rarityHeap *RarityHeap) {
+
+	length := rarityHeap.Len()
+
+	fmt.Printf("Top %d Rarest Tokens:\n", *topK)
+
+	for i := 0; i < length; i++ {
+        element := heap.Pop(rarityHeap).(*RarityScorecard)
+        fmt.Printf("Token ID: %d, Rarity: %f\n", element.id, element.rarity)
+    }
 }
 
 // debug function
