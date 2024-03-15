@@ -3,10 +3,10 @@ package main
 // this is another implementation using worker pool approach instead of dynamically creating goroutines
 
 func worker(worker_id int, jobs <-chan int, results chan<- *Token, colUrl string) {
-    for tokenId := range jobs {
+	for tokenId := range jobs {
 		//logger.Println(string(COLOR_GREEN), fmt.Sprintf("Getting token %d", j), string(COLOR_RESET))
-        token := FetchAndUpdateToken(tokenId, colUrl)
-        results <- token
+		token := FetchAndUpdateToken(tokenId, colUrl)
+		results <- token
     }
 }
 

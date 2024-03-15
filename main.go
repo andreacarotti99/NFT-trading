@@ -51,13 +51,14 @@ type Collection struct {
 // Define a custom HTTP client with specific configurations
 var customClient = &http.Client{
 	// Set a timeout for the HTTP client. Determines how long the client should wait
-    Timeout: time.Second * 20, 
-    Transport: &http.Transport{
+	Timeout: time.Second * 20, 
+	Transport: &http.Transport{
 		// Keeping idle connections allows for faster subsequent requests to the same host
-        // by reusing the existing connection rather than establishing a new one
-        MaxIdleConns:        40, 
-        IdleConnTimeout:     90 * time.Second, // Maximum amount of time an idle (keep-alive) connection will remain idle before being closed
-        ExpectContinueTimeout: 1 * time.Second, // Prevents the client from waiting too long for this intermediate response.
+		// by reusing the existing connection rather than establishing a new one
+		DisableKeepAlives: false,
+		MaxIdleConns:        40, 
+		IdleConnTimeout:     90 * time.Second, // Maximum amount of time an idle (keep-alive) connection will remain idle before being closed
+		ExpectContinueTimeout: 1 * time.Second, // Prevents the client from waiting too long for this intermediate response.
     },
 }
 
@@ -76,12 +77,12 @@ func main() {
 
 	var tokens []*Token
 
-	// Fetch tokens and their metadata for the 'azuki' collection. The function
+	// Fetch tokens and their metadata for the 'azuki' collection. Updating the maps.
 	if *useWorkerPool {
 		// 'GetTokensAndMetadataWithWorkerPool' uses a worker pool pattern to manage concurrency. This is defined in 'workers.go'
 		tokens = GetTokensAndMetadataWithWorkerPool(azuki, *maxRoutines) //implementation in workers.go
 	} else {
-		// 'getTokensAndMetadataWithSemaphore' utilizes a semaphore to limit concurrent HTTP requests.
+		// 'getTokensAndMetadataWithSemaphore' utilizes a semaphore to limit concurrent HTTP requests. This is defined in 'semaphores.go'
 		tokens = GetTokensAndMetadataWithSemaphore(azuki)
 	}	
 
