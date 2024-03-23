@@ -34,6 +34,8 @@ Arguments:
 - topK: number of rarest token you want to display (default 5)
 - routines: maximum number of concurrent go routines used (suggested value [500-900]) (default 500)
 - useWorkerPool: boolean to use the implementation with worker pool (true) or semaphores (default false)
+- collection: name of the collection in the defined API endpoint
+- numOfTokens: total number of tokens inside the collection
 
 Example:
 ```
