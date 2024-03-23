@@ -1,16 +1,15 @@
 package main
 
 import (
+	"container/heap"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"sync"
 	"time"
-	"container/heap"
-	"flag"
 )
-
 
 const URL = "https://go-challenge.skip.money"
 const COLLECTION = "azuki"
@@ -19,15 +18,17 @@ const COLOR_RED = "\033[31m"
 const COLOR_RESET = "\033[0m"
 
 var (
-	maxRoutines = flag.Int("routines", 500, "the maximum number of concurrent goroutines") // Value suggested less than 2500
-	topK = flag.Int("topK", 5, "the number of top rarest tokens to display")
-	useWorkerPool = flag.Bool("useWorkerPool", false, "use worker pool pattern instead of semaphore for concurrency")
+	maxRoutines    = flag.Int("routines", 500, "the maximum number of concurrent goroutines") // Value suggested less than 2500
+	topK           = flag.Int("topK", 5, "the number of top rarest tokens to display")
+	useWorkerPool  = flag.Bool("useWorkerPool", false, "use worker pool pattern instead of semaphore for concurrency")
+	collectionName = flag.String("collection", "azuki1", "specific name of the collection inside the defined API endpoint")
+	numOfTokens    = flag.Int("numOfTokens", 10000, "total number of tokens inside the collection")
 )
 
 var (
-    mutex                    sync.Mutex
-    traitValueCount          = make(map[string]int)
-    traitCategoryValueCount  = make(map[string]int)
+	mutex                   sync.Mutex
+	traitValueCount         = make(map[string]int)
+	traitCategoryValueCount = make(map[string]int)
 )
 
 var logger *log.Logger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
@@ -47,21 +48,19 @@ type Collection struct {
 	url   string
 }
 
-
 // Define a custom HTTP client with specific configurations
 var customClient = &http.Client{
 	// Set a timeout for the HTTP client. Determines how long the client should wait
-	Timeout: time.Second * 20, 
+	Timeout: time.Second * 20,
 	Transport: &http.Transport{
 		// Keeping idle connections allows for faster subsequent requests to the same host
 		// by reusing the existing connection rather than establishing a new one
-		DisableKeepAlives: false,
-		MaxIdleConns:        40, 
-		IdleConnTimeout:     90 * time.Second, // Maximum amount of time an idle (keep-alive) connection will remain idle before being closed
-		ExpectContinueTimeout: 1 * time.Second, // Prevents the client from waiting too long for this intermediate response.
-    },
+		DisableKeepAlives:     false,
+		MaxIdleConns:          40,
+		IdleConnTimeout:       90 * time.Second, // Maximum amount of time an idle (keep-alive) connection will remain idle before being closed
+		ExpectContinueTimeout: 1 * time.Second,  // Prevents the client from waiting too long for this intermediate response.
+	},
 }
-
 
 func main() {
 	flag.Parse()
@@ -69,10 +68,10 @@ func main() {
 	// Record the start time of the program execution for measurements
 	startTime := time.Now()
 
-	// Initialize the azuki collection
-	azuki := Collection{
-		count: 10000,
-		url:   "azuki1",
+	// Initialize the collection
+	collection := Collection{
+		count: *numOfTokens,
+		url:   *collectionName,
 	}
 
 	var tokens []*Token
@@ -80,15 +79,14 @@ func main() {
 	// Fetch tokens and their metadata for the 'azuki' collection. Updating the maps.
 	if *useWorkerPool {
 		// 'GetTokensAndMetadataWithWorkerPool' uses a worker pool pattern to manage concurrency. This is defined in 'workers.go'
-		tokens = GetTokensAndMetadataWithWorkerPool(azuki, *maxRoutines) //implementation in workers.go
+		tokens = GetTokensAndMetadataWithWorkerPool(collection, *maxRoutines) //implementation in workers.go
 	} else {
 		// 'getTokensAndMetadataWithSemaphore' utilizes a semaphore to limit concurrent HTTP requests. This is defined in 'semaphores.go'
-		tokens = GetTokensAndMetadataWithSemaphore(azuki)
-	}	
+		tokens = GetTokensAndMetadataWithSemaphore(collection)
+	}
 
 	// Initialize a priority queue (heap) to store tokens by their rarity scores.
-	rarityHeap := NewRarityHeap() 
-
+	rarityHeap := NewRarityHeap()
 
 	// Iterate through all fetched tokens and adding to the heap the rarest tokens
 	for _, token := range tokens {
@@ -115,4 +113,3 @@ func main() {
 	endTime := time.Now()
 	fmt.Printf("Total execution time: %v\n", endTime.Sub(startTime))
 }
-
