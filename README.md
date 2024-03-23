@@ -37,6 +37,6 @@ Arguments:
 
 Example:
 ```
-go run . -topK=5 -routines=900 -useWorkerPool=true
+go run . -topK=5 -routines=900 -useWorkerPool=true -collection="azuki1" -numOfTokens=10000
 ```
 The suggested routines were tested with up to 2500 routines, more than that caused network errors.  
